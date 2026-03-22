@@ -92,6 +92,19 @@ if __name__ == '__main__':
     root = args.root
     target = args.dataset
 
+    # Print loaded configuration
+    print("=" * 60)
+    print("Configuration Loaded:")
+    print("=" * 60)
+    print(f"  root            : {root}")
+    print(f"  dataset         : {target}")
+    print(f"  model_path      : {args.model_path}")
+    print(f"  eeg_signals_path: {args.eeg_signals_path}")
+    print(f"  splits_path     : {args.splits_path}")
+    print(f"  config_patch    : {args.config_patch}")
+    print(f"  imagenet_path   : {args.imagenet_path}")
+    print("=" * 60)
+
     sd = load_full(args.model_path, map_location='cpu')
     config = sd['config']
     # update paths
