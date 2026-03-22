@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import wandb
 import torch
@@ -27,30 +28,59 @@ def _restore_rng_state(state, device):
     """Restore RNG from checkpoint. Legacy checkpoints store a single CPU tensor from torch.random.get_rng_state()."""
     if state is None:
         return
-    if isinstance(state, dict):
-        cpu_s = state.get('cpu')
-        if cpu_s is not None:
-            torch.random.set_rng_state(cpu_s.cpu() if torch.is_tensor(cpu_s) else cpu_s)
-        cuda_s = state.get('cuda')
-        if (
-            cuda_s is not None
-            and device is not None
-            and getattr(device, 'type', None) == 'cuda'
-            and torch.cuda.is_available()
-        ):
-            torch.cuda.set_rng_state(cuda_s.cpu() if torch.is_tensor(cuda_s) else cuda_s)
-        return
-    s = state.cpu() if torch.is_tensor(state) else state
-    if (
-        device is not None
+    ref_cpu = torch.random.get_rng_state()
+    ref_cuda = (
+        torch.cuda.get_rng_state()
+        if device is not None
         and getattr(device, 'type', None) == 'cuda'
         and torch.cuda.is_available()
-    ):
-        ref = torch.cuda.get_rng_state()
-        if s.shape == ref.shape and s.dtype == ref.dtype:
-            torch.cuda.set_rng_state(s)
-            return
-    torch.random.set_rng_state(s)
+        else None
+    )
+
+    def _try_set_cpu(t):
+        t = t.cpu() if torch.is_tensor(t) else t
+        if not torch.is_tensor(t) or t.shape != ref_cpu.shape or t.dtype != ref_cpu.dtype:
+            return False
+        torch.random.set_rng_state(t)
+        return True
+
+    def _try_set_cuda(t):
+        if ref_cuda is None:
+            return False
+        t = t.cpu() if torch.is_tensor(t) else t
+        if not torch.is_tensor(t) or t.shape != ref_cuda.shape or t.dtype != ref_cuda.dtype:
+            return False
+        torch.cuda.set_rng_state(t)
+        return True
+
+    if isinstance(state, dict):
+        cpu_s = state.get('cpu')
+        if cpu_s is not None and not _try_set_cpu(cpu_s):
+            warnings.warn(
+                'Checkpoint CPU RNG state shape does not match this PyTorch version; skipping CPU RNG restore.',
+                UserWarning,
+                stacklevel=2,
+            )
+        cuda_s = state.get('cuda')
+        if cuda_s is not None and ref_cuda is not None and not _try_set_cuda(cuda_s):
+            warnings.warn(
+                'Checkpoint CUDA RNG state shape does not match this device/PyTorch; skipping CUDA RNG restore.',
+                UserWarning,
+                stacklevel=2,
+            )
+        return
+
+    s = state.cpu() if torch.is_tensor(state) else state
+    if _try_set_cuda(s):
+        return
+    if _try_set_cpu(s):
+        return
+    warnings.warn(
+        'Checkpoint RNG state is not a valid CPU or CUDA state for this run (wrong size or dtype); '
+        'skipping RNG restore — sampling will not match the saved checkpoint RNG.',
+        UserWarning,
+        stacklevel=2,
+    )
 
 
 def create_model_from_config(config, num_voxels, global_pool):

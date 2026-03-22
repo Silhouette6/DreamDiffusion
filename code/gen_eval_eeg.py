@@ -81,6 +81,9 @@ if __name__ == '__main__':
     # update paths
     config.root_path = root
 
+    # Override checkpoint snapshot (sd['config'] ignores edits to config.py)
+    config.num_samples = 25
+    config.ddim_steps = 250
 
     output_path = os.path.join(config.root_path, 'results', 'eval',  
                     '%s'%(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S")))
