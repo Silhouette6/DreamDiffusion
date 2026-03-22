@@ -1,0 +1,26 @@
+# 核心框架（你已经装好了，可以不写或写成 >=）
+# torch==2.6.0 
+
+# 项目特定依赖 (建议放宽版本以兼容 Torch 2.6)
+omegaconf==2.1.1
+einops>=0.4.0
+torch-fidelity==0.3.0
+Pillow>=9.0.1
+timm>=0.5.4
+tqdm>=4.64.0
+wandb>=0.12.21
+# 必须升级这两个库以适配 Torch 2.x
+pytorch-lightning>=2.0.0
+torchmetrics>=1.0.0
+
+lpips==0.1.4
+
+# 基础数学与绘图库 (不设固定版本，由 pip 寻找最合适版本)
+numpy
+matplotlib
+natsort
+kornia
+scikit-image
+
+# 本地代码
+-e ./code

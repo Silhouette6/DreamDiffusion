@@ -1,0 +1,60 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# --- Virtual env ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- 数据集（整目录，含 EEG、ImageNet 子集等）---
+datasets/
+
+# --- 模型权重与 checkpoint（保留 yaml/json 等小配置文件）---
+pretrains/
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+*.onnx
+*.pb
+pytorch_model.bin
+*.h5
+*.msgpack
+
+# Diffusers / HF 单文件大权重（若放在仓库内）
+diffusion_pytorch_model.safetensors
+
+# --- 训练/推理输出 ---
+exps/
+results/
+wandb/
+lightning_logs/
+outputs/
+
+# --- 环境变量与密钥 ---
+.env
+.env.*
+!.env.example
+
+# --- 本地下载缓存（若克隆在工程目录内）---
+.cache/
