@@ -127,7 +127,7 @@ if __name__ == '__main__':
     grid_imgs.save(os.path.join(output_path, f'./samples_train.png'))
 
     grid, samples = generative_model.generate(dataset_test, config.num_samples, 
-                config.ddim_steps, config.HW, limit=None, state=state, output_path = output_path) # generate 10 instances
+                config.ddim_steps, config.HW, limit=10, state=state, output_path = output_path) # generate 10 instances
     grid_imgs = Image.fromarray(grid.astype(np.uint8))
 
 

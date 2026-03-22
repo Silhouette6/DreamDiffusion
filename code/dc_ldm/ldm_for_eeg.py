@@ -240,7 +240,7 @@ class eLDM:
         
 
     @torch.no_grad()
-    def generate(self, fmri_embedding, num_samples, ddim_steps, HW=None, limit=None, state=None, output_path = None):
+    def generate(self, fmri_embedding, num_samples, ddim_steps, HW=None, limit=None, state=None, output_path = None, batch_size_accel=20):
         # fmri_embedding: n, seq_len, embed_dim
         all_samples = []
         if HW is None:
@@ -264,16 +264,17 @@ class eLDM:
                         break
                 latent = item['eeg']
                 gt_image = rearrange(item['image'], 'h w c -> 1 c h w') # h w c
-                print(f"rendering {num_samples} examples in {ddim_steps} steps.")
+                print(f"rendering {num_samples} examples (batch_size={batch_size_accel}) in {ddim_steps} steps.")
                 # assert latent.shape[-1] == self.fmri_latent_dim, 'dim error'
                 
-                c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                # c = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                samples_ddim, _ = sampler.sample(S=ddim_steps, 
+                # Use larger batch for acceleration, then truncate to num_samples
+                c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=batch_size_accel).to(self.device))
+                samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
-                                                batch_size=num_samples,
+                                                batch_size=batch_size_accel,
                                                 shape=shape,
                                                 verbose=False)
+                samples_ddim = samples_ddim[:num_samples]  # Keep only first num_samples
 
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
@@ -375,11 +376,12 @@ class eLDM_eval:
         
 
     @torch.no_grad()
-    def generate(self, fmri_embedding, num_samples, ddim_steps, HW=None, limit=None, state=None, output_path = None):
+    def generate(self, fmri_embedding, num_samples, ddim_steps, HW=None, limit=None, state=None, output_path = None, batch_size_accel=20):
         # fmri_embedding: n, seq_len, embed_dim
+        # batch_size_accel: actual batch size for acceleration (default 20), outputs will be truncated to num_samples
         all_samples = []
         if HW is None:
-            shape = (self.ldm_config.model.params.channels, 
+            shape = (self.ldm_config.model.params.channels,
                 self.ldm_config.model.params.image_size, self.ldm_config.model.params.image_size)
         else:
             num_resolutions = len(self.ldm_config.model.params.first_stage_config.params.ddconfig.ch_mult)
@@ -400,29 +402,30 @@ class eLDM_eval:
                 # print(item)
                 latent = item['eeg']
                 gt_image = rearrange(item['image'], 'h w c -> 1 c h w') # h w c
-                print(f"rendering {num_samples} examples in {ddim_steps} steps.")
+                print(f"rendering {num_samples} examples (batch_size={batch_size_accel}) in {ddim_steps} steps.")
                 # assert latent.shape[-1] == self.fmri_latent_dim, 'dim error'
-                
-                c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                # c = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                samples_ddim, _ = sampler.sample(S=ddim_steps, 
+
+                # Use larger batch for acceleration, then truncate to num_samples
+                c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=batch_size_accel).to(self.device))
+                samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
-                                                batch_size=num_samples,
+                                                batch_size=batch_size_accel,
                                                 shape=shape,
                                                 verbose=False)
+                samples_ddim = samples_ddim[:num_samples]  # Keep only first num_samples
 
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
                 gt_image = torch.clamp((gt_image+1.0)/2.0, min=0.0, max=1.0)
-                
+
                 all_samples.append(torch.cat([gt_image, x_samples_ddim.detach().cpu()], dim=0)) # put groundtruth at first
                 if output_path is not None:
                     samples_t = (255. * torch.cat([gt_image, x_samples_ddim.detach().cpu()], dim=0).numpy()).astype(np.uint8)
                     for copy_idx, img_t in enumerate(samples_t):
                         img_t = rearrange(img_t, 'c h w -> h w c')
-                        Image.fromarray(img_t).save(os.path.join(output_path, 
+                        Image.fromarray(img_t).save(os.path.join(output_path,
                             f'./test{count}-{copy_idx}.png'))
-        
+
         # display as grid
         grid = torch.stack(all_samples, 0)
         grid = rearrange(grid, 'n b c h w -> (n b) c h w')
@@ -431,5 +434,5 @@ class eLDM_eval:
         # to image
         grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
         model = model.to('cpu')
-        
+
         return grid, (255. * torch.stack(all_samples, 0).cpu().numpy()).astype(np.uint8)
