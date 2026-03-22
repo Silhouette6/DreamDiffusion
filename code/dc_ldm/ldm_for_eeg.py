@@ -14,6 +14,45 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from sc_mbm.mae_for_eeg import eeg_encoder, classify_network, mapping 
 from PIL import Image
+
+
+def _rng_state_for_checkpoint():
+    out = {'cpu': torch.random.get_rng_state()}
+    if torch.cuda.is_available():
+        out['cuda'] = torch.cuda.get_rng_state()
+    return out
+
+
+def _restore_rng_state(state, device):
+    """Restore RNG from checkpoint. Legacy checkpoints store a single CPU tensor from torch.random.get_rng_state()."""
+    if state is None:
+        return
+    if isinstance(state, dict):
+        cpu_s = state.get('cpu')
+        if cpu_s is not None:
+            torch.random.set_rng_state(cpu_s.cpu() if torch.is_tensor(cpu_s) else cpu_s)
+        cuda_s = state.get('cuda')
+        if (
+            cuda_s is not None
+            and device is not None
+            and getattr(device, 'type', None) == 'cuda'
+            and torch.cuda.is_available()
+        ):
+            torch.cuda.set_rng_state(cuda_s.cpu() if torch.is_tensor(cuda_s) else cuda_s)
+        return
+    s = state.cpu() if torch.is_tensor(state) else state
+    if (
+        device is not None
+        and getattr(device, 'type', None) == 'cuda'
+        and torch.cuda.is_available()
+    ):
+        ref = torch.cuda.get_rng_state()
+        if s.shape == ref.shape and s.dtype == ref.dtype:
+            torch.cuda.set_rng_state(s)
+            return
+    torch.random.set_rng_state(s)
+
+
 def create_model_from_config(config, num_voxels, global_pool):
     model = eeg_encoder(time_len=num_voxels, patch_size=config.patch_size, embed_dim=config.embed_dim,
                 depth=config.depth, num_heads=config.num_heads, mlp_ratio=config.mlp_ratio, global_pool=global_pool) 
@@ -164,8 +203,7 @@ class eLDM:
             {
                 'model_state_dict': self.model.state_dict(),
                 'config': config,
-                'state': torch.random.get_rng_state()
-
+                'state': _rng_state_for_checkpoint(),
             },
             os.path.join(output_path, 'checkpoint.pth')
         )
@@ -186,9 +224,8 @@ class eLDM:
         model = self.model.to(self.device)
         sampler = PLMSSampler(model)
         # sampler = DDIMSampler(model)
-        if state is not None:
-            torch.cuda.set_rng_state(state)
-            
+        _restore_rng_state(state, self.device)
+
         with model.ema_scope():
             model.eval()
             for count, item in enumerate(fmri_embedding):
@@ -301,8 +338,7 @@ class eLDM_eval:
             {
                 'model_state_dict': self.model.state_dict(),
                 'config': config,
-                'state': torch.random.get_rng_state()
-
+                'state': _rng_state_for_checkpoint(),
             },
             os.path.join(output_path, 'checkpoint.pth')
         )
@@ -323,9 +359,8 @@ class eLDM_eval:
         model = self.model.to(self.device)
         sampler = PLMSSampler(model)
         # sampler = DDIMSampler(model)
-        if state is not None:
-            torch.cuda.set_rng_state(state)
-            
+        _restore_rng_state(state, self.device)
+
         with model.ema_scope():
             model.eval()
             for count, item in enumerate(fmri_embedding):
