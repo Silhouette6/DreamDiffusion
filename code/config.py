@@ -95,6 +95,9 @@ class Config_Generative_Model:
         self.eeg_signals_path = os.path.join(self.root_path, 'datasets/eeg_5_95_std.pth')
         self.splits_path = os.path.join(self.root_path, 'datasets/block_splits_by_image_single.pth')
         # self.splits_path = os.path.join(self.root_path, 'datasets/block_splits_by_image_all.pth')
+        self.imagenet_path = os.path.join(self.root_path, 'datasets/imageNet_images')
+        self.config_patch = os.path.join(self.root_path, 'pretrains/models/config15.yaml')
+        self.model_path = os.path.join(self.root_path, 'pretrains/eeg_pretrain/checkpoint.pth')
         self.roi = 'VC'
         self.patch_size = 4 # 16
         self.embed_dim = 1024

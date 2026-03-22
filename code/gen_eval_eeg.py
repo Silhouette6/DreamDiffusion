@@ -71,8 +71,24 @@ def get_args_parser():
 
 
 if __name__ == '__main__':
+    # Load default config
+    default_config = Config_Generative_Model()
+
     args = get_args_parser()
     args = args.parse_args()
+
+    # Use config defaults if args not provided
+    if args.model_path is None:
+        args.model_path = default_config.model_path
+    if args.splits_path is None:
+        args.splits_path = default_config.splits_path
+    if args.eeg_signals_path is None:
+        args.eeg_signals_path = default_config.eeg_signals_path
+    if args.config_patch is None:
+        args.config_patch = default_config.config_patch
+    if args.imagenet_path is None:
+        args.imagenet_path = default_config.imagenet_path
+
     root = args.root
     target = args.dataset
 
