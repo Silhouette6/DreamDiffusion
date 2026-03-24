@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 from PIL import Image
 from transformers import AutoProcessor, CLIPVisionModelWithProjection
+from tqdm import tqdm
 
 from torch_compat import load_full
 
@@ -40,7 +41,7 @@ def main():
     p.add_argument("--manifest_path", type=str, default="datasets/embeddings/image_manifest.json")
     p.add_argument("--missing_path", type=str, default="datasets/embeddings/missing_images.json")
     p.add_argument("--subject", type=int, default=0, help="0 means all subjects; otherwise filter by subject id.")
-    p.add_argument("--batch_size", type=int, default=512)
+    p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--device", type=str, default=_default_device())
     p.add_argument("--dtype", type=str, default="fp16", choices=["fp32", "fp16", "bf16"])
     p.add_argument("--max_items", type=int, default=0, help="0 means no limit (debug).")
@@ -130,7 +131,7 @@ def main():
         batch_pixel_values = []
 
     kept = 0
-    for ds_idx in split_indices:
+    for ds_idx in tqdm(split_indices, desc=f"Processing {args.split_name} image embeddings"):
         if args.max_items and kept >= args.max_items:
             break
 
