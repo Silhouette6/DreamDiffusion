@@ -165,11 +165,26 @@ def main():
                     "wnid": image_name.split("_")[0],
                     "dataset_index": ds_idx,
                     "missing_path": str(img_path.as_posix()),
+                    "reason": "file_not_found",
                 }
             )
             continue
 
-        img = Image.open(img_path).convert("RGB")
+        try:
+            img = Image.open(img_path).convert("RGB")
+        except Exception as e:
+            missing.append(
+                {
+                    "key": image_name,
+                    "image_name": image_name,
+                    "wnid": image_name.split("_")[0],
+                    "dataset_index": ds_idx,
+                    "missing_path": str(img_path.as_posix()),
+                    "reason": f"image_error: {type(e).__name__}",
+                }
+            )
+            continue
+
         inputs = processor(images=img, return_tensors="pt")
         pv = inputs["pixel_values"].squeeze(0)  # [3, H, W]
 
