@@ -103,7 +103,7 @@ class EEGEmbeddingDataset(Dataset):
         s = self.samples[i]
         eeg = s["eeg_raw"].float().t()          # (T, C)
         eeg = eeg[20:460, :]                     # crop temporal window
-        eeg = np.array(eeg.transpose(0, 1))      # (C, T')
+        eeg = eeg.transpose(0, 1).numpy()          # (C, T')
         x = np.linspace(0, 1, eeg.shape[-1])
         x2 = np.linspace(0, 1, self.data_len)
         f = interp1d(x, eeg)
