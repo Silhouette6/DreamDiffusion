@@ -38,7 +38,7 @@ def main():
     p.add_argument("--output_root", type=str, default="datasets/embeddings/text")
     p.add_argument("--manifest_path", type=str, default="datasets/embeddings/text_manifest.json")
     p.add_argument("--missing_path", type=str, default="datasets/embeddings/missing_texts.json")
-    p.add_argument("--subject", type=int, default=0, help="0 means all subjects; otherwise filter by subject id.")
+    p.add_argument("--subject", type=int, default=4, help="0 means all subjects; otherwise filter by subject id.")
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--device", type=str, default=_default_device())
     p.add_argument("--dtype", type=str, default="fp16", choices=["fp32", "fp16", "bf16"])

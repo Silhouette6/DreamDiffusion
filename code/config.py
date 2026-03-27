@@ -184,4 +184,68 @@ class Config_Cls_Model:
         self.HW = None
         # resume check util
         self.model_meta = None
-        self.checkpoint_path = None 
+        self.checkpoint_path = None
+
+
+class Config_TextAlign_Finetune:
+    def __init__(self):
+        # project parameters
+        self.seed = 2022
+        self.root_path = '../dreamdiffusion/'
+        self.output_path = os.path.join(self.root_path, 'exps/text_align/')
+
+        # data paths
+        self.eeg_signals_path = os.path.join(self.root_path, 'datasets/eeg_5_95_std.pth')
+        self.splits_path = os.path.join(self.root_path, 'datasets/block_splits_by_image_single.pth')
+        self.imagenet_path = os.path.join(self.root_path, 'datasets/imageNet_images')
+        self.image_embed_dir = os.path.join(self.root_path, 'datasets/embeddings/image')
+        self.text_embed_dir = os.path.join(self.root_path, 'datasets/embeddings/text')
+
+        # pretrained EEG encoder (Stage A MAE)
+        self.pretrain_mbm_path = os.path.join(self.root_path, 'pretrains/eeg_pretrain/checkpoint.pth')
+
+        # EEG encoder architecture (must match pretrained checkpoint)
+        self.patch_size = 4
+        self.embed_dim = 1024
+        self.depth = 24
+        self.num_heads = 16
+        self.mlp_ratio = 1.0
+        self.global_pool = False
+
+        # CLIP target dimension
+        self.clip_dim = 768
+
+        # freeze strategy
+        self.num_unfreeze_blocks = 4
+
+        # projection head
+        self.proj_dropout = 0.5
+
+        # loss weights (scaled to compensate MSE/InfoNCE magnitude gap)
+        self.lambda_vis = 200.0
+        self.lambda_txt = 1.0
+        self.lambda_cons = 100.0
+
+        # InfoNCE temperature
+        self.temperature_init = 0.07
+        self.learnable_temperature = True
+
+        # differential learning rates
+        self.lr_heads = 1e-4
+        self.lr_encoder = 1e-5
+
+        # training parameters
+        self.weight_decay = 0.05
+        self.num_epoch = 100
+        self.batch_size = 32
+        self.warmup_epochs = 10
+        self.clip_grad = 1.0
+        self.use_amp = True
+
+        # data
+        self.subject = 4
+
+        # logging & checkpointing
+        self.save_every_n_epoch = 5
+        self.log_every_n_step = 10
+        self.use_wandb = False
