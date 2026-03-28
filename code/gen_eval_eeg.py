@@ -105,6 +105,7 @@ if __name__ == '__main__':
     print(f"  root            : {root}")
     print(f"  dataset         : {target}")
     print(f"  model_path      : {args.model_path}")
+    print(f"  encoder_path    : {args.encoder_path}")
     print(f"  eeg_signals_path: {args.eeg_signals_path}")
     print(f"  splits_path     : {args.splits_path}")
     print(f"  config_patch    : {args.config_patch}")
@@ -166,13 +167,13 @@ if __name__ == '__main__':
     state = sd['state']
     os.makedirs(output_path, exist_ok=True)
     grid, _ = generative_model.generate(dataset_train, config.num_samples, 
-                config.ddim_steps, config.HW, 10) # generate 10 instances
+                config.ddim_steps, config.HW, 5) # generate 10 instances
     grid_imgs = Image.fromarray(grid.astype(np.uint8))
     
     grid_imgs.save(os.path.join(output_path, f'./samples_train.png'))
 
     grid, samples = generative_model.generate(dataset_test, config.num_samples, 
-                config.ddim_steps, config.HW, limit=10, state=state, output_path = output_path) # generate 10 instances
+                config.ddim_steps, config.HW, limit=5, state=state, output_path = output_path) # generate 10 instances
     grid_imgs = Image.fromarray(grid.astype(np.uint8))
 
 
