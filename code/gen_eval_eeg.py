@@ -118,7 +118,7 @@ if __name__ == '__main__':
     config.root_path = root
 
     # Override checkpoint snapshot (sd['config'] ignores edits to config.py)
-    config.num_samples = 25
+    config.num_samples = 5
     config.ddim_steps = 250
 
     output_path = os.path.join(config.root_path, 'results', 'eval',  
