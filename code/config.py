@@ -89,8 +89,8 @@ class Config_Generative_Model:
     def __init__(self):
         # project parameters
         self.seed = 2022
-        self.root_path = '../dreamdiffusion/'
-        self.output_path = '../dreamdiffusion/exps/'
+        self.root_path = '../DreamDiffusion/'
+        self.output_path = '../output/exps/'
 
         self.eeg_signals_path = os.path.join(self.root_path, 'datasets/eeg_5_95_std.pth')
         self.splits_path = os.path.join(self.root_path, 'datasets/block_splits_by_image_single.pth')
@@ -98,6 +98,7 @@ class Config_Generative_Model:
         self.imagenet_path = os.path.join(self.root_path, 'datasets/imageNet_images')
         self.config_patch = os.path.join(self.root_path, 'pretrains/models/config15.yaml')
         self.model_path = os.path.join(self.root_path, 'pretrains/eeg_pretrain/checkpoint.pth')
+        self.encoder_path = os.path.join(self.root_path, 'exps/text_align/20260328_114236/checkpoint_ep060.pth')
         self.roi = 'VC'
         self.patch_size = 4 # 16
         self.embed_dim = 1024
@@ -191,7 +192,7 @@ class Config_TextAlign_Finetune:
     def __init__(self):
         # project parameters
         self.seed = 2022
-        self.root_path = '../dreamdiffusion/'
+        self.root_path = '../DreamDiffusion/'
         self.output_path = os.path.join(self.root_path, 'exps/text_align/')
 
         # data paths

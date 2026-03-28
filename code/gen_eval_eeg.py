@@ -67,6 +67,10 @@ def get_args_parser():
     parser.add_argument('--imagenet_path', type=str, default=None,
                         help='imagenet path.')
 
+    parser.add_argument('--encoder_path', type=str, default=None,
+                        help='Path to text-align fine-tuned encoder checkpoint. '
+                             'If provided, replaces the EEG encoder in the base eLDM model.')
+
     return parser
 
 
@@ -88,6 +92,8 @@ if __name__ == '__main__':
         args.config_patch = default_config.config_patch
     if args.imagenet_path is None:
         args.imagenet_path = default_config.imagenet_path
+    if args.encoder_path is None:
+        args.encoder_path = default_config.encoder_path
 
     root = args.root
     target = args.dataset
@@ -147,6 +153,16 @@ if __name__ == '__main__':
     # m, u = model.load_state_dict(pl_sd, strict=False)
     generative_model.model.load_state_dict(sd['model_state_dict'], strict=False)
     print('load ldm successfully')
+
+    if args.encoder_path is not None:
+        enc_sd = load_full(args.encoder_path, map_location='cpu')
+        enc_key = "model" if "model" in enc_sd else "model_state_dict"
+        enc_weights = enc_sd[enc_key]
+        prefixed = {"cond_stage_model.mae." + k: v for k, v in enc_weights.items()}
+        m, u = generative_model.model.load_state_dict(prefixed, strict=False)
+        print(f"Injected fine-tuned encoder from {args.encoder_path}")
+        print(f"  replaced {len(prefixed) - len(u)} keys, {len(u)} unexpected")
+
     state = sd['state']
     os.makedirs(output_path, exist_ok=True)
     grid, _ = generative_model.generate(dataset_train, config.num_samples, 
