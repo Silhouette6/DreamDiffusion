@@ -222,9 +222,9 @@ class Config_TextAlign_Finetune:
         self.proj_dropout = 0.5
 
         # loss weights (scaled to compensate MSE/InfoNCE magnitude gap)
-        self.lambda_vis = 200.0
+        self.lambda_vis = 800.0
         self.lambda_txt = 1.0
-        self.lambda_cons = 100.0
+        self.lambda_cons = 500.0
 
         # InfoNCE temperature
         self.temperature_init = 0.07
@@ -236,9 +236,9 @@ class Config_TextAlign_Finetune:
 
         # training parameters
         self.weight_decay = 0.05
-        self.num_epoch = 100
+        self.num_epoch = 60
         self.batch_size = 32
-        self.warmup_epochs = 10
+        self.warmup_epochs = 6
         self.clip_grad = 1.0
         self.use_amp = True
 

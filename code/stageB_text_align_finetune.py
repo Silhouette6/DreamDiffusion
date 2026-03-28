@@ -11,6 +11,7 @@ import math
 import os
 import sys
 import time
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -402,9 +403,11 @@ def train(config):
     print(f"Parameters: {trainable:,} trainable / {total:,} total")
 
     # --- training loop ---
-    os.makedirs(config.output_path, exist_ok=True)
-    tb_dir = os.path.join(config.output_path, "tensorboard")
+    run_dir = os.path.join(config.output_path, datetime.now().strftime("%Y%m%d_%H%M%S"))
+    os.makedirs(run_dir, exist_ok=True)
+    tb_dir = os.path.join(run_dir, "tensorboard")
     writer = SummaryWriter(log_dir=tb_dir)
+    print(f"Experiment dir: {run_dir}")
     print(f"TensorBoard logs: {tb_dir}")
 
     best_val_loss = float("inf")
@@ -491,15 +494,15 @@ def train(config):
 
         if val["loss"] < best_val_loss:
             best_val_loss = val["loss"]
-            save_checkpoint(model, config, epoch, config.output_path)
+            save_checkpoint(model, config, epoch, run_dir)
             print(f"  ** new best val loss: {best_val_loss:.4f}")
 
         if epoch % config.save_every_n_epoch == 0:
-            save_checkpoint(model, config, epoch, config.output_path)
+            save_checkpoint(model, config, epoch, run_dir)
 
     writer.close()
     print(f"Training complete. Best val loss: {best_val_loss:.4f}")
-    print(f"Checkpoints saved to: {config.output_path}")
+    print(f"Checkpoints saved to: {run_dir}")
     print(f"TensorBoard logs: {tb_dir}")
 
 
