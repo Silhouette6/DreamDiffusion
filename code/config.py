@@ -259,8 +259,10 @@ class Config_Generation:
 
         # base eLDM checkpoint (full diffusion pipeline)
         self.model_path = os.path.join(self.root_path, 'pretrains/eeg_pretrain/checkpoint.pth')
-        # fine-tuned encoder checkpoint (set None for baseline)
+        # fine-tuned encoder checkpoint
         self.encoder_path = os.path.join(self.root_path, 'exps/text_align/20260328_114236/checkpoint_ep060.pth')
+        # set False to skip encoder injection and run baseline
+        self.inject_encoder = True
 
         # data paths
         self.eeg_signals_path = os.path.join(self.root_path, 'datasets/eeg_5_95_std.pth')

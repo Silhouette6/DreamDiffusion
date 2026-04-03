@@ -80,7 +80,7 @@ def main():
         if val is not None:
             setattr(config, key, val)
 
-    if config.encoder_path is not None:
+    if config.inject_encoder and config.encoder_path is not None:
         model_name = os.path.splitext(os.path.basename(config.encoder_path))[0]
     else:
         model_name = "baseline"
@@ -90,7 +90,8 @@ def main():
     print("Stage C: EEG -> Images")
     print("=" * 60)
     print(f"  model_path      : {config.model_path}")
-    print(f"  encoder_path    : {config.encoder_path}")
+    print(f"  inject_encoder  : {config.inject_encoder}")
+    print(f"  encoder_path    : {config.encoder_path if config.inject_encoder else 'N/A (baseline)'}")
     print(f"  output_dir      : {output_dir}")
     print(f"  text_data       : {config.text_data}")
     print(f"  num_samples     : {config.num_samples}")
@@ -131,7 +132,7 @@ def main():
     print("Loaded eLDM base model")
 
     # --- optionally inject fine-tuned encoder ---
-    if config.encoder_path is not None:
+    if config.inject_encoder and config.encoder_path is not None:
         enc_sd = load_full(config.encoder_path, map_location="cpu")
         enc_key = "model" if "model" in enc_sd else "model_state_dict"
         enc_weights = enc_sd[enc_key]
