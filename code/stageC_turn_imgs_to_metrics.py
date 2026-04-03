@@ -74,9 +74,9 @@ def _build_clip(device):
 def _encode_images_clip(clip_model, processor, image_paths, device):
     """Return L2-normalised CLIP image embeddings [N, D]."""
     images = [Image.open(p).convert("RGB") for p in image_paths]
-    inputs = processor(images=images, return_tensors="pt", padding=True)
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    feats = clip_model.get_image_features(**inputs)
+    inputs = processor(images=images, return_tensors="pt")
+    pixel_values = inputs["pixel_values"].to(device)
+    feats = clip_model.get_image_features(pixel_values=pixel_values)
     return F.normalize(feats, dim=-1)
 
 
