@@ -273,7 +273,7 @@ class Config_Generation:
         self.output_base = os.path.join(self.root_path, 'results/generated')
 
         # generation parameters
-        self.num_samples = 3
+        self.num_samples = 20
         self.ddim_steps = 250
         self.batch_size_accel = 20
         self.subject = 4

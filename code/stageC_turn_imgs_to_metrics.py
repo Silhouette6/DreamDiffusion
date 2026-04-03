@@ -157,16 +157,25 @@ def parse_args():
     return parser.parse_args()
 
 
+def _find_gen_images(folder):
+    """Find all numbered generated images (1.png, 2.png, ...) in a folder."""
+    i = 1
+    paths = []
+    while (folder / f"{i}.png").exists():
+        paths.append(folder / f"{i}.png")
+        i += 1
+    return paths
+
+
 def _is_sample_folder(folder):
     """Check if a folder contains the expected per-sample files."""
-    required = ["GT.png", "text.txt", "1.png", "2.png", "3.png"]
-    return all((folder / f).exists() for f in required)
+    return (folder / "GT.png").exists() and (folder / "text.txt").exists() and len(_find_gen_images(folder)) > 0
 
 
 def process_one_sample(folder, device, inception, clip_model, processor, tokenizer, class_captions):
     """Compute metrics for a single sample folder. Returns metrics dict."""
     gt_path = folder / "GT.png"
-    gen_paths = [folder / f"{i}.png" for i in range(1, 4)]
+    gen_paths = _find_gen_images(folder)
     text_file = folder / "text.txt"
 
     text = text_file.read_text(encoding="utf-8", errors="ignore").strip()
