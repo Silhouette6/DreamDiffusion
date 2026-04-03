@@ -131,7 +131,7 @@ class Config_Generative_Model:
 
         # diffusion sampling parameters
         self.num_samples = 5    # 被覆盖
-        self.ddim_steps = 250
+        self.ddim_steps = 250   # 被覆盖
         self.HW = None
         # resume check util
         self.model_meta = None
@@ -250,3 +250,44 @@ class Config_TextAlign_Finetune:
         self.save_every_n_epoch = 5
         self.log_every_n_step = 10
         self.use_wandb = False
+
+
+class Config_Generation:
+    """Configuration for stageC_turn_eegs_to_imgs.py"""
+    def __init__(self):
+        self.root_path = '../DreamDiffusion/'
+
+        # base eLDM checkpoint (full diffusion pipeline)
+        self.model_path = os.path.join(self.root_path, 'pretrains/eeg_pretrain/checkpoint.pth')
+        # fine-tuned encoder checkpoint (set None for baseline)
+        self.encoder_path = os.path.join(self.root_path, 'exps/text_align/20260328_114236/checkpoint_ep060.pth')
+
+        # data paths
+        self.eeg_signals_path = os.path.join(self.root_path, 'datasets/eeg_5_95_std.pth')
+        self.splits_path = os.path.join(self.root_path, 'datasets/block_splits_by_image_single.pth')
+        self.imagenet_path = os.path.join(self.root_path, 'datasets/imageNet_images')
+        self.text_data = os.path.join(self.root_path, 'datasets/text_data')
+        self.config_patch = os.path.join(self.root_path, 'pretrains/models/config15.yaml')
+
+        # output
+        self.output_base = os.path.join(self.root_path, 'results/generated')
+
+        # generation parameters
+        self.num_samples = 3
+        self.ddim_steps = 250
+        self.batch_size_accel = 20
+        self.subject = 4
+
+
+class Config_Metrics:
+    """Configuration for stageC_turn_imgs_to_metrics.py"""
+    def __init__(self):
+        self.root_path = '../DreamDiffusion/'
+
+        # input sample folder (must contain text.txt, GT.png, 1.png, 2.png, 3.png)
+        self.folder = None
+
+        # text_data directory for 40-way classification
+        self.text_data = os.path.join(self.root_path, 'datasets/text_data')
+
+        self.seed = 42
