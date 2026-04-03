@@ -76,7 +76,8 @@ def _encode_images_clip(clip_model, processor, image_paths, device):
     images = [Image.open(p).convert("RGB") for p in image_paths]
     inputs = processor(images=images, return_tensors="pt")
     pixel_values = inputs["pixel_values"].to(device)
-    feats = clip_model.get_image_features(pixel_values=pixel_values)
+    vision_out = clip_model.vision_model(pixel_values=pixel_values)
+    feats = clip_model.visual_projection(vision_out.pooler_output)
     return F.normalize(feats, dim=-1)
 
 
@@ -85,7 +86,8 @@ def _encode_texts_clip(clip_model, tokenizer, texts, device):
     """Return L2-normalised CLIP text embeddings [N, D]."""
     tokens = tokenizer(texts, padding=True, truncation=True, max_length=77, return_tensors="pt")
     tokens = {k: v.to(device) for k, v in tokens.items()}
-    feats = clip_model.get_text_features(**tokens)
+    text_out = clip_model.text_model(**tokens)
+    feats = clip_model.text_projection(text_out.pooler_output)
     return F.normalize(feats, dim=-1)
 
 
