@@ -35,10 +35,10 @@ def _collect_summaries(root: Path):
     """Find all metric_summary.json files under *root*."""
     summaries = {}
     # direct child
-    if (root / "metric_summary.json").exists():
-        summaries[root.name] = root / "metric_summary.json"
+    if (root / "metrics_summary.json").exists():
+        summaries[root.name] = root / "metrics_summary.json"
     # nested sub-folders
-    for p in sorted(root.rglob("metric_summary.json")):
+    for p in sorted(root.rglob("metrics_summary.json")):
         summaries[p.parent.name] = p
     return summaries
 
@@ -49,7 +49,7 @@ def main():
     assert root.is_dir(), f"Folder not found: {root}"
 
     summaries = _collect_summaries(root)
-    assert len(summaries) > 0, f"No metric_summary.json found under {root}"
+    assert len(summaries) > 0, f"No metrics_summary.json found under {root}"
     print(f"Found {len(summaries)} metric_summary file(s)\n")
 
     # ---- gather per-sample metrics across all summaries ----
