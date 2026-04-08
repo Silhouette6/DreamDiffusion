@@ -80,13 +80,12 @@ def main():
         name for name, m in all_samples.items()
         if m.get("top1_accuracy_40way", -1) == 0
     ]
-    if zero_acc_samples:
-        print("=" * 60)
-        print("WARNING: the following samples have top1_accuracy_40way == 0:")
-        for s in zero_acc_samples:
-            print(f"  - {s}")
-        print("=" * 60)
-        print()
+    print("=" * 60)
+    print(f"top1_accuracy_40way == 0 samples ({len(zero_acc_samples)}):")
+    print(f"  {repr(zero_acc_samples)}")
+    print("  ^ copy to EXCLUDED_SAMPLES if needed")
+    print("=" * 60)
+    print()
 
     # ---- compute overall averages ----
     keys = ["inception_feature_distance", "top1_accuracy_40way", "clip_score_text"]
