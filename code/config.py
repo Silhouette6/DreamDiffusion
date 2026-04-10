@@ -246,6 +246,12 @@ class Config_TextAlign_Finetune:
         # data
         self.subject = 4
 
+        # joint conditioning mapper fine-tuning (Strategy B)
+        # when True, channel_mapper + dim_mapper are extracted from the eLDM
+        # checkpoint and trained jointly so the entire EEG->UNet chain adapts
+        self.use_conditioning_mapper = False
+        self.lr_mapper = 5e-5
+
         # logging & checkpointing
         self.save_every_n_epoch = 5
         self.log_every_n_step = 10

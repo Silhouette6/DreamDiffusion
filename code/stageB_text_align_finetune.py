@@ -151,11 +151,22 @@ class ProjectionHead(nn.Module):
 class TextAlignModel(nn.Module):
 
     def __init__(self, encoder, seq_len, embed_dim, clip_dim,
-                 dropout=0.5, temperature_init=0.07, learnable_temperature=True):
+                 dropout=0.5, temperature_init=0.07, learnable_temperature=True,
+                 channel_mapper=None, dim_mapper=None):
         super().__init__()
         self.encoder = encoder
-        self.proj_vis = ProjectionHead(seq_len, embed_dim, clip_dim, dropout)
-        self.proj_txt = ProjectionHead(seq_len, embed_dim, clip_dim, dropout)
+        self.channel_mapper = channel_mapper
+        self.dim_mapper = dim_mapper
+
+        if channel_mapper is not None and dim_mapper is not None:
+            proj_seq_len = 77
+            proj_input_dim = dim_mapper.out_features
+        else:
+            proj_seq_len = seq_len
+            proj_input_dim = embed_dim
+
+        self.proj_vis = ProjectionHead(proj_seq_len, proj_input_dim, clip_dim, dropout)
+        self.proj_txt = ProjectionHead(proj_seq_len, proj_input_dim, clip_dim, dropout)
         log_temp = math.log(1.0 / temperature_init)
         self.log_temperature = nn.Parameter(
             torch.tensor(log_temp),
@@ -168,6 +179,10 @@ class TextAlignModel(nn.Module):
 
     def forward(self, eeg):
         latent = self.encoder(eeg)                   # (N, seq_len, embed_dim)
+        if self.channel_mapper is not None:
+            latent = self.channel_mapper(latent)      # (N, 77, embed_dim)
+        if self.dim_mapper is not None:
+            latent = self.dim_mapper(latent)           # (N, 77, cond_dim)
         z_vis = self.proj_vis(latent)                 # (N, clip_dim)
         z_txt = self.proj_txt(latent)                 # (N, clip_dim)
         return z_vis, z_txt
@@ -242,6 +257,16 @@ def setup_freeze_and_param_groups(model, config):
         {"params": encoder_params, "lr": config.lr_encoder},
         {"params": head_params,    "lr": config.lr_heads},
     ]
+
+    # conditioning mapper params (Strategy B)
+    mapper_params = []
+    if model.channel_mapper is not None:
+        mapper_params.extend(model.channel_mapper.parameters())
+    if model.dim_mapper is not None:
+        mapper_params.extend(model.dim_mapper.parameters())
+    if mapper_params:
+        param_groups.append({"params": mapper_params, "lr": config.lr_mapper})
+
     return param_groups
 
 
@@ -263,7 +288,14 @@ def adjust_lr(optimizer, epoch, config):
                                config.lr_heads)
     optimizer.param_groups[0]["lr"] = lr_enc
     optimizer.param_groups[1]["lr"] = lr_head
-    return lr_enc, lr_head
+
+    lr_mapper = None
+    if len(optimizer.param_groups) > 2:
+        lr_mapper = cosine_warmup_lr(epoch, config.warmup_epochs, config.num_epoch,
+                                     config.lr_mapper)
+        optimizer.param_groups[2]["lr"] = lr_mapper
+
+    return lr_enc, lr_head, lr_mapper
 
 
 # ---------------------------------------------------------------------------
@@ -272,22 +304,22 @@ def adjust_lr(optimizer, epoch, config):
 
 def save_checkpoint(model, config, epoch, output_dir):
     os.makedirs(output_dir, exist_ok=True)
+    save_dict = {
+        "model": model.encoder.state_dict(),
+        "config": config,
+        "epoch": epoch,
+        "proj_vis": model.proj_vis.state_dict(),
+        "proj_txt": model.proj_txt.state_dict(),
+    }
+    if model.channel_mapper is not None:
+        save_dict["channel_mapper"] = model.channel_mapper.state_dict()
+    if model.dim_mapper is not None:
+        save_dict["dim_mapper"] = model.dim_mapper.state_dict()
+
     path = os.path.join(output_dir, f"checkpoint_ep{epoch:03d}.pth")
-    torch.save({
-        "model": model.encoder.state_dict(),
-        "config": config,
-        "epoch": epoch,
-        "proj_vis": model.proj_vis.state_dict(),
-        "proj_txt": model.proj_txt.state_dict(),
-    }, path)
+    torch.save(save_dict, path)
     latest = os.path.join(output_dir, "checkpoint.pth")
-    torch.save({
-        "model": model.encoder.state_dict(),
-        "config": config,
-        "epoch": epoch,
-        "proj_vis": model.proj_vis.state_dict(),
-        "proj_txt": model.proj_txt.state_dict(),
-    }, latest)
+    torch.save(save_dict, latest)
     print(f"  [save] {path}")
 
 
@@ -384,12 +416,39 @@ def train(config):
     encoder.load_checkpoint(raw_sd)
     print("Loaded EEG encoder from pretrain checkpoint")
 
+    # --- optionally extract conditioning mapper from eLDM checkpoint ---
+    channel_mapper = None
+    dim_mapper = None
+    if config.use_conditioning_mapper:
+        full_sd = pretrain[sd_key]
+        cm_prefix = "cond_stage_model.channel_mapper."
+        dm_prefix = "cond_stage_model.dim_mapper."
+        cm_sd = {k[len(cm_prefix):]: v for k, v in full_sd.items() if k.startswith(cm_prefix)}
+        dm_sd = {k[len(dm_prefix):]: v for k, v in full_sd.items() if k.startswith(dm_prefix)}
+
+        if cm_sd and dm_sd:
+            cond_dim = dm_sd["weight"].shape[0]
+            channel_mapper = nn.Sequential(
+                nn.Conv1d(seq_len, seq_len // 2, 1, bias=True),
+                nn.Conv1d(seq_len // 2, 77, 1, bias=True),
+            )
+            channel_mapper.load_state_dict(cm_sd)
+            dim_mapper = nn.Linear(config.embed_dim, cond_dim, bias=True)
+            dim_mapper.load_state_dict(dm_sd)
+            print(f"Loaded conditioning mapper from eLDM checkpoint "
+                  f"(channel_mapper: {seq_len}->77, dim_mapper: {config.embed_dim}->{cond_dim})")
+        else:
+            print("WARNING: use_conditioning_mapper=True but no mapper weights found in checkpoint; "
+                  "falling back to encoder-only mode")
+
     # --- model ---
     model = TextAlignModel(
         encoder, seq_len, config.embed_dim, config.clip_dim,
         dropout=config.proj_dropout,
         temperature_init=config.temperature_init,
         learnable_temperature=config.learnable_temperature,
+        channel_mapper=channel_mapper,
+        dim_mapper=dim_mapper,
     ).to(device)
 
     # --- freeze + optimizer ---
@@ -415,7 +474,7 @@ def train(config):
 
     for epoch in range(1, config.num_epoch + 1):
         model.train()
-        lr_enc, lr_head = adjust_lr(optimizer, epoch - 1, config)
+        lr_enc, lr_head, lr_map = adjust_lr(optimizer, epoch - 1, config)
 
         epoch_vis = epoch_txt = epoch_cons = epoch_total = 0.0
         n_samples = 0
@@ -473,12 +532,15 @@ def train(config):
         writer.add_scalar("train_epoch/L_total", avg(epoch_total), epoch)
         writer.add_scalar("lr/encoder", lr_enc, epoch)
         writer.add_scalar("lr/heads", lr_head, epoch)
+        if lr_map is not None:
+            writer.add_scalar("lr/mapper", lr_map, epoch)
         writer.add_scalar("params/temperature", model.temperature.item(), epoch)
 
+        lr_extra = f" lr_map={lr_map:.2e}" if lr_map is not None else ""
         print(f"Epoch {epoch}/{config.num_epoch}  "
               f"train: total={avg(epoch_total):.4f} vis={avg(epoch_vis):.4f} "
               f"txt={avg(epoch_txt):.4f} cons={avg(epoch_cons):.4f}  "
-              f"lr_enc={lr_enc:.2e} lr_head={lr_head:.2e}  "
+              f"lr_enc={lr_enc:.2e} lr_head={lr_head:.2e}{lr_extra}  "
               f"tau={model.temperature.item():.4f}  {dt:.1f}s")
 
         # --- validation ---
@@ -540,6 +602,11 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--no_amp", action="store_true")
 
+    # Strategy B: joint conditioning mapper fine-tuning
+    parser.add_argument("--use_conditioning_mapper", action="store_true",
+                        help="Also train channel_mapper + dim_mapper from the eLDM checkpoint")
+    parser.add_argument("--lr_mapper", type=float, default=None)
+
     return parser.parse_args()
 
 
@@ -562,7 +629,7 @@ def main():
                 "image_embed_dir", "text_embed_dir", "pretrain_mbm_path",
                 "num_unfreeze_blocks", "proj_dropout",
                 "lambda_vis", "lambda_txt", "lambda_cons", "temperature_init",
-                "lr_heads", "lr_encoder", "weight_decay",
+                "lr_heads", "lr_encoder", "lr_mapper", "weight_decay",
                 "num_epoch", "batch_size", "warmup_epochs", "clip_grad",
                 "subject", "seed"]:
         val = getattr(args, key, None)
@@ -571,6 +638,8 @@ def main():
 
     if args.no_amp:
         config.use_amp = False
+    if args.use_conditioning_mapper:
+        config.use_conditioning_mapper = True
 
     train(config)
 

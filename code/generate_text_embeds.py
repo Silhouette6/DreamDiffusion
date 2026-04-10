@@ -174,6 +174,7 @@ def main():
             continue
 
         text = cap_path.read_text(encoding="utf-8", errors="ignore").strip()
+        text = text.removeprefix("<s>").removesuffix("</s>").strip()
         if not text:
             missing.append(
                 {

@@ -137,8 +137,22 @@ def main():
         enc_key = "model" if "model" in enc_sd else "model_state_dict"
         enc_weights = enc_sd[enc_key]
         prefixed = {"cond_stage_model.mae." + k: v for k, v in enc_weights.items()}
+
+        # Strategy B: also inject channel_mapper and dim_mapper if present
+        n_mapper = 0
+        if "channel_mapper" in enc_sd:
+            for k, v in enc_sd["channel_mapper"].items():
+                prefixed["cond_stage_model.channel_mapper." + k] = v
+                n_mapper += 1
+        if "dim_mapper" in enc_sd:
+            for k, v in enc_sd["dim_mapper"].items():
+                prefixed["cond_stage_model.dim_mapper." + k] = v
+                n_mapper += 1
+
         m, u = generative_model.model.load_state_dict(prefixed, strict=False)
-        print(f"Injected fine-tuned encoder ({len(prefixed) - len(u)} keys replaced)")
+        replaced = len(prefixed) - len(u)
+        extra = f" + {n_mapper} mapper keys" if n_mapper > 0 else ""
+        print(f"Injected fine-tuned encoder ({replaced} keys replaced{extra})")
 
     # --- generation loop (adapted from eLDM_eval.generate) ---
     model = generative_model.model.to(device)
@@ -170,6 +184,7 @@ def main():
             if os.path.isfile(cap_file):
                 with open(cap_file, "r", encoding="utf-8") as f:
                     text = f.read().strip()
+                text = text.removeprefix("<s>").removesuffix("</s>").strip()
             else:
                 text = ""
             with open(os.path.join(sample_dir, "text.txt"), "w", encoding="utf-8") as f:

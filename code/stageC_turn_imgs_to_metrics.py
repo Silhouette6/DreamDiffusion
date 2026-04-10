@@ -106,6 +106,7 @@ def _collect_class_captions(text_data_dir):
         caps = []
         for cap_file in wnid_dir.glob("*_caption.txt"):
             text = cap_file.read_text(encoding="utf-8", errors="ignore").strip()
+            text = text.removeprefix("<s>").removesuffix("</s>").strip()
             if text:
                 caps.append(text)
         if caps:
@@ -115,22 +116,28 @@ def _collect_class_captions(text_data_dir):
 
 @torch.no_grad()
 def top1_accuracy_40way(gen_paths, target_text, target_wnid,
-                        class_captions, clip_model, processor, tokenizer, device):
+                        class_captions, clip_model, processor, tokenizer, device,
+                        num_trials=5):
     """
     40-way zero-shot classification accuracy averaged over generated images.
-    For each of the 39 non-target classes, randomly select one caption.
+    Runs *num_trials* rounds with different random distractor captions and
+    averages the results to reduce variance from random caption selection.
     """
     other_wnids = [w for w in class_captions if w != target_wnid]
-    texts = [target_text]
-    for w in other_wnids:
-        texts.append(random.choice(class_captions[w]))
-
-    text_feats = _encode_texts_clip(clip_model, tokenizer, texts, device)
     img_feats = _encode_images_clip(clip_model, processor, gen_paths, device)
 
-    sims = img_feats @ text_feats.t()
-    correct = (sims.argmax(dim=1) == 0).float()
-    return float(correct.mean().item())
+    trial_accs = []
+    for _ in range(num_trials):
+        texts = [target_text]
+        for w in other_wnids:
+            texts.append(random.choice(class_captions[w]))
+
+        text_feats = _encode_texts_clip(clip_model, tokenizer, texts, device)
+        sims = img_feats @ text_feats.t()
+        correct = (sims.argmax(dim=1) == 0).float()
+        trial_accs.append(float(correct.mean().item()))
+
+    return float(np.mean(trial_accs))
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +163,8 @@ def parse_args():
     parser.add_argument("--text_data", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--num_trials", type=int, default=5,
+                        help="Number of 40-way accuracy trials to average (reduces variance)")
     return parser.parse_args()
 
 
@@ -174,7 +183,8 @@ def _is_sample_folder(folder):
     return (folder / "GT.png").exists() and (folder / "text.txt").exists() and len(_find_gen_images(folder)) > 0
 
 
-def process_one_sample(folder, device, inception, clip_model, processor, tokenizer, class_captions):
+def process_one_sample(folder, device, inception, clip_model, processor, tokenizer,
+                       class_captions, num_trials=5):
     """Compute metrics for a single sample folder. Returns metrics dict."""
     gt_path = folder / "GT.png"
     gen_paths = _find_gen_images(folder)
@@ -192,6 +202,7 @@ def process_one_sample(folder, device, inception, clip_model, processor, tokeniz
     acc = top1_accuracy_40way(
         [str(p) for p in gen_paths], text, target_wnid,
         class_captions, clip_model, processor, tokenizer, device,
+        num_trials=num_trials,
     )
 
     metrics = {
@@ -245,11 +256,15 @@ def main():
     class_captions = _collect_class_captions(config.text_data)
     print(f"  Found {len(class_captions)} classes in {config.text_data}\n")
 
+    num_trials = args.num_trials
+    print(f"40-way accuracy trials per sample: {num_trials}\n")
+
     all_metrics = {}
     for i, folder in enumerate(sample_folders):
         image_name = folder.name
         print(f"[{i + 1}/{len(sample_folders)}] {image_name} ...", end="  ")
-        m = process_one_sample(folder, device, inception, clip_model, processor, tokenizer, class_captions)
+        m = process_one_sample(folder, device, inception, clip_model, processor, tokenizer,
+                               class_captions, num_trials=num_trials)
         all_metrics[image_name] = m
         print(f"IFD={m['inception_feature_distance']:.4f}  "
               f"Top1={m['top1_accuracy_40way']:.4f}  "
